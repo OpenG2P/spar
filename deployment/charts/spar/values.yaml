@@ -200,12 +200,12 @@ benePortalAPI:
   nameOverride: ""
   fullnameOverride: ""
   envVars:
-    SPAR_BENE_PORTAL_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
-    SPAR_BENE_PORTAL_API_DB_PORT: '5432'
-    SPAR_BENE_PORTAL_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
-    SPAR_BENE_PORTAL_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
+    G2P_SPAR_BENE_PORTAL_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
+    G2P_SPAR_BENE_PORTAL_API_DB_PORT: '5432'
+    G2P_SPAR_BENE_PORTAL_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
+    G2P_SPAR_BENE_PORTAL_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
   envVarsFrom:
-    SPAR_BENE_PORTAL_API_DB_PASSWORD:
+    G2P_SPAR_BENE_PORTAL_API_DB_PASSWORD:
       secretKeyRef:
         name: '{{ tpl .Values.global.sparDBSecret $ }}'
         key: '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
@@ -265,7 +265,7 @@ benePortalAPI:
     command:
     - 'sh'
     - '-c'
-    - 'until pg_isready -U ${SPAR_BENE_PORTAL_API_DB_USERNAME} -h ${SPAR_BENE_PORTAL_API_DB_HOSTNAME} -p ${SPAR_BENE_PORTAL_API_DB_PORT:-5432} -d ${SPAR_BENE_PORTAL_API_DB_DBNAME:-spardb}; do sleep 3; done'
+    - 'until pg_isready -U ${G2P_SPAR_BENE_PORTAL_API_DB_USERNAME} -h ${G2P_SPAR_BENE_PORTAL_API_DB_HOSTNAME} -p ${G2P_SPAR_BENE_PORTAL_API_DB_PORT:-5432} -d ${G2P_SPAR_BENE_PORTAL_API_DB_DBNAME:-spardb}; do sleep 3; done'
   ingress:
     enabled: false
     className: ""
