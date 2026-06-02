@@ -66,6 +66,44 @@ keycloak-init:
           redirectUris: []
           webOrigins: []
 
+# Seeds shared SPAR reference data (the `strategy` table) at install/upgrade via
+# a post-install/post-upgrade Job. Seeding is ADDITIVE and IDEMPOTENT: each row
+# is inserted by its pinned `id` with `ON CONFLICT (id) DO NOTHING`, so existing
+# rows are never modified or deleted. To add a strategy later, append a new entry
+# with a new `id` and run `helm upgrade` — nothing else changes.
+#
+# A Strategy defines how a Financial Address (FA) — or an ID — is serialized and
+# parsed:
+#   construct_strategy   : a Python format string, e.g. "{bank_code}-{acc}"
+#   deconstruct_strategy : a regex with named groups, e.g. "(?P<bank_code>.*)-(?P<acc>.*)"
+# The keys must match the FA/ID field names. The link/update API references a
+# strategy by its integer `id` (fa.strategy_id), so ids must stay stable.
+seedData:
+  enabled: true
+  # Image providing psql / pg_isready for the seed Job.
+  image: jbergknoff/postgresql-client
+  strategies:
+    - id: 1
+      description: Key Cloak
+      strategy_type: ID
+      construct_strategy: 'token:{sub}@nationalId'
+      deconstruct_strategy: '^token:(?P<sub>.[^.]*)@nationalId$'
+    - id: 2
+      description: Bank
+      strategy_type: FA
+      construct_strategy: 'account_number:{account_number}.branch_name:{branch_name}.branch_code:{branch_code}.bank_name:{bank_name}.bank_code:{bank_code}.fa_type:{fa_type}'
+      deconstruct_strategy: '^account_number:(?P<account_number>.*)\.branch_name:(?P<branch_name>.*)\.branch_code:(?P<branch_code>.*)\.bank_name:(?P<bank_name>.*)\.bank_code:(?P<bank_code>.*)\.fa_type:(?P<fa_type>.*)$'
+    - id: 3
+      description: Email
+      strategy_type: FA
+      construct_strategy: 'email_address:{email_address}.wallet_provider_name:{wallet_provider_name}.wallet_provider_code:{wallet_provider_code}.fa_type:{fa_type}'
+      deconstruct_strategy: '^email_address:(?P<email_address>.*)\.wallet_provider_name:(?P<wallet_provider_name>.*)\.wallet_provider_code:(?P<wallet_provider_code>.*)\.fa_type:(?P<fa_type>.*)$'
+    - id: 4
+      description: Phone
+      strategy_type: FA
+      construct_strategy: 'mobile_number:{mobile_number}.wallet_provider_name:{wallet_provider_name}.wallet_provider_code:{wallet_provider_code}.fa_type:{fa_type}'
+      deconstruct_strategy: '^mobile_number:(?P<mobile_number>.*)\.wallet_provider_name:(?P<wallet_provider_name>.*)\.wallet_provider_code:(?P<wallet_provider_code>.*)\.fa_type:(?P<fa_type>.*)$'
+
 sparMapperAPI:
   enabled: true
   sparHostname: spar.trial.openg2p.org

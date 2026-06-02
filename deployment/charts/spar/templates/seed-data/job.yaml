@@ -1,0 +1,68 @@
+{{- if .Values.seedData.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-seed-data-{{ .Release.Revision }}
+  labels:
+    {{- include "spar.labels" . | nindent 4 }}
+  annotations:
+    # Run after the release's resources are in place (post-install) and on every
+    # upgrade. The script itself waits for the DB and the `strategy` table
+    # (created by the API `migrate`), so it is resilient to ordering.
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    # Keep the Job after a successful run (do NOT use hook-succeeded) so it stays
+    # visible for inspection; it's removed before the next run (before-hook-creation)
+    # and garbage-collected by ttlSecondsAfterFinished.
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "spar.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.sparMapperAPI.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: seed-data
+          image: {{ .Values.seedData.image }}
+          env:
+            - name: PGHOST
+              value: '{{ tpl .Values.global.postgresqlHost $ }}'
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: '{{ tpl .Values.global.sparDB $ }}'
+            - name: PGUSER
+              value: '{{ tpl .Values.global.sparDBUser $ }}'
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ tpl .Values.global.sparDBSecret $ }}'
+                  key: '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for database ${PGHOST}:${PGPORT}/${PGDATABASE} ..."
+              until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"; do sleep 3; done
+              echo "Waiting for 'strategy' table (created by the API migrate) ..."
+              until [ -n "$(psql -tAc "SELECT to_regclass('public.strategy')")" ]; do sleep 5; done
+              echo "Seeding strategy table ..."
+              psql -v ON_ERROR_STOP=1 -f /seed/seed.sql
+              echo "Seed complete."
+          volumeMounts:
+            - name: seed-sql
+              mountPath: /seed
+              readOnly: true
+      volumes:
+        - name: seed-sql
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-seed-data
+{{- end }}

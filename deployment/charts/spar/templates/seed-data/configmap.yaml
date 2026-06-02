@@ -1,0 +1,17 @@
+{{- if .Values.seedData.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-seed-data
+  labels:
+    {{- include "spar.labels" . | nindent 4 }}
+data:
+  seed.sql: |
+    -- SPAR strategy seed data. Idempotent: each row is inserted by its pinned
+    -- id with ON CONFLICT (id) DO NOTHING, so existing rows are never changed.
+    {{- range .Values.seedData.strategies }}
+    INSERT INTO strategy (id, description, strategy_type, construct_strategy, deconstruct_strategy, active, created_at, updated_at)
+    VALUES ({{ .id }}, '{{ .description | replace "'" "''" }}', '{{ .strategy_type | replace "'" "''" }}', '{{ .construct_strategy | replace "'" "''" }}', '{{ .deconstruct_strategy | replace "'" "''" }}', {{ if hasKey . "active" }}{{ .active }}{{ else }}true{{ end }}, now(), now())
+    ON CONFLICT (id) DO NOTHING;
+    {{- end }}
+{{- end }}
