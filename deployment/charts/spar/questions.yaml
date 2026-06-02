@@ -1,5 +1,5 @@
 questions:
-# SPAR Partner API 
+# SPAR Partner API
 - variable: sparHostname
   description: Hostname for all SPAR services
   type: string

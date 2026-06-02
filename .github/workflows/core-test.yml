@@ -58,18 +58,18 @@ jobs:
           pip install git+https://github.com/openg2p/openg2p-fastapi-common@v1.1.4#subdirectory=openg2p-fastapi-auth
           pip install git+https://github.com/openg2p/openg2p-fastapi-common@v1.1.4#subdirectory=openg2p-fastapi-common
           pip install pytest pytest-asyncio pytest-cov
-          pip install -e ./core/openg2p-spar-models
-          pip install -e ./core/openg2p-spar-mapper-core
+          pip install -e ./core/models
+          pip install -e ./core/mapper-core
 
       - name: Run Mapper Core tests
-        working-directory: core/openg2p-spar-mapper-core
+        working-directory: core/mapper-core
         run: |
           pytest tests/ -v --cov=openg2p_spar_mapper_core --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./core/openg2p-spar-mapper-core/coverage.xml
+          files: ./core/mapper-core/coverage.xml
           flags: mapper-core
           name: mapper-core-py${{ matrix.py }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -117,19 +117,19 @@ jobs:
       - name: Install local dependencies
         run: |
           pip install pytest pytest-asyncio pytest-cov
-          pip install -e ./core/openg2p-spar-models
-          pip install -e ./core/openg2p-spar-mapper-core
-          pip install -e ./core/openg2p-spar-bene-portal-api
+          pip install -e ./core/models
+          pip install -e ./core/mapper-core
+          pip install -e ./core/bene-portal-api
 
       - name: Run Bene Portal API tests
-        working-directory: core/openg2p-spar-bene-portal-api
+        working-directory: core/bene-portal-api
         run: |
           pytest tests/ -v --cov=openg2p_spar_bene_portal_api --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./core/openg2p-spar-bene-portal-api/coverage.xml
+          files: ./core/bene-portal-api/coverage.xml
           flags: bene-portal-api
           name: bene-portal-api-py${{ matrix.py }}
           token: ${{ secrets.CODECOV_TOKEN }}

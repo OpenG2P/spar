@@ -25,9 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
 
 # Local SPAR source (build context = repo root).
-ADD --chown=${container_user}:${container_user_group} core/openg2p-spar-models /app/openg2p-spar-models
-ADD --chown=${container_user}:${container_user_group} core/openg2p-spar-mapper-core /app/openg2p-spar-mapper-core
-ADD --chown=${container_user}:${container_user_group} core/openg2p-spar-mapper-partner-api /app/openg2p-spar-mapper-partner-api
+ADD --chown=${container_user}:${container_user_group} core/models /app/models
+ADD --chown=${container_user}:${container_user_group} core/mapper-core /app/mapper-core
+ADD --chown=${container_user}:${container_user_group} core/mapper-partner-api /app/mapper-partner-api
 
 # Install Python dependencies
 RUN python -m pip install --upgrade pip setuptools wheel && \
@@ -36,9 +36,9 @@ RUN python -m pip install --upgrade pip setuptools wheel && \
       git+https://github.com/openg2p/openg2p-fastapi-common@${FASTAPI_COMMON_REF}#subdirectory=openg2p-fastapi-auth \
       git+https://github.com/openg2p/openg2p-fastapi-common@${FASTAPI_COMMON_REF}#subdirectory=openg2p-fastapi-partner-auth \
       git+https://github.com/openg2p/openg2p-fastapi-common@${FASTAPI_COMMON_REF}#subdirectory=openg2p-fastapi-common && \
-    python -m pip install --no-cache-dir -e /app/openg2p-spar-models && \
-    python -m pip install --no-cache-dir -e /app/openg2p-spar-mapper-core && \
-    python -m pip install --no-cache-dir -e /app/openg2p-spar-mapper-partner-api
+    python -m pip install --no-cache-dir -e /app/models && \
+    python -m pip install --no-cache-dir -e /app/mapper-core && \
+    python -m pip install --no-cache-dir -e /app/mapper-partner-api
 
 # Switch to non-root user
 USER ${container_user}
@@ -51,7 +51,7 @@ ENV SPAR_MAPPER_PARTNER_API_PORT=8000
 ENV SPAR_MAPPER_PARTNER_API_NO_OF_WORKERS=4
 
 # Set working directory to the mapper partner API
-WORKDIR /app/openg2p-spar-mapper-partner-api
+WORKDIR /app/mapper-partner-api
 
 # Run application
 CMD ["sh", "-c", "python main.py migrate && gunicorn main:app --workers ${SPAR_MAPPER_PARTNER_API_NO_OF_WORKERS} --worker-class uvicorn.workers.UvicornWorker --bind ${SPAR_MAPPER_PARTNER_API_HOST}:${SPAR_MAPPER_PARTNER_API_PORT} --log-level info --access-logfile - --error-logfile -"]

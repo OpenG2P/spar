@@ -1,4 +1,4 @@
-name: Build & Push SPAR Mapper Partner API Docker
+name: Publish SPAR Mapper Partner API Docker
 
 # Builds the SPAR Mapper Partner API image from the LOCAL in-repo source
 # (core/). The image tag is the repository ref (branch name or git tag).
@@ -16,9 +16,9 @@ on:
     tags:
       - "**"
     paths:
-      - 'core/openg2p-spar-models/**'
-      - 'core/openg2p-spar-mapper-core/**'
-      - 'core/openg2p-spar-mapper-partner-api/**'
+      - 'core/models/**'
+      - 'core/mapper-core/**'
+      - 'core/mapper-partner-api/**'
       - 'docker/spar-apis/mapper-partner-api/**'
       - '.github/workflows/docker-build-mapper-partner-api.yml'
   workflow_dispatch:

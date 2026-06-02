@@ -1,4 +1,4 @@
-name: Build & Push SPAR Bene Portal API Docker
+name: Publish SPAR Bene Portal API Docker
 
 # Builds the SPAR Bene Portal API image from the LOCAL in-repo source (core/).
 # The image tag is the repository ref (branch name or git tag).
@@ -16,9 +16,9 @@ on:
     tags:
       - "**"
     paths:
-      - 'core/openg2p-spar-models/**'
-      - 'core/openg2p-spar-mapper-core/**'
-      - 'core/openg2p-spar-bene-portal-api/**'
+      - 'core/models/**'
+      - 'core/mapper-core/**'
+      - 'core/bene-portal-api/**'
       - 'docker/spar-apis/bene-portal-api/**'
       - '.github/workflows/docker-build-bene-portal-api.yml'
   workflow_dispatch:
