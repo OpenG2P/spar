@@ -1,0 +1,301 @@
+global:
+  postgresqlHost: commons-postgresql
+  sparDB: '{{ printf "%s" .Release.Name | replace "-" "_" }}'
+  sparDBUser: '{{ printf "%s_user" .Release.Name | replace "-" "_" }}'
+  sparDBSecret: '{{ .Release.Name }}'
+  sparDBUserPasswordKey: '{{ .Release.Name }}-db-user'
+
+  # Security & Authentication
+  # Internal service name of Keymanager
+  keymanagerInstallationName: commons-services-keymanager
+  # Public (namespace-scoped) Keycloak hostname used by apps for the OIDC
+  # issuer/token URL. The keycloak-init Job below talks to the same Keycloak
+  # over its internal cluster URL.
+  keycloakBaseUrl: 'https://keycloak.{{ .Release.Namespace }}.openg2p.org'
+  keycloakRealm: 'staff'
+  keycloakIssuerUrl: '{{ tpl .Values.global.keycloakBaseUrl $ }}/realms/{{ tpl .Values.global.keycloakRealm $ }}'
+  # OIDC client ID — must match the clientId provisioned in keycloak-init.realms
+  authClientId: 'openg2p-spar'
+  # K8s Secret name holding the client password (created by keycloak-init).
+  # By convention the Secret is named after the client ID.
+  authClientSecret: '{{ tpl .Values.global.authClientId $ }}'
+  # Key inside the secret containing the client password
+  authClientSecretKey: 'client_secret'
+
+postgres-init:
+  enabled: true
+  postgresql:
+    host: '{{ .Values.global.postgresqlHost }}'
+    port: 5432
+    # Hard coding. Same as one defined under Odoo
+    existingSecret: commons-postgresql
+    existingSecretPostgresPasswordKey: postgres-password
+  databases:
+    # Same as db in Odoo
+    - name: '{{ tpl .Values.global.sparDB $ }}'
+      user: '{{ tpl .Values.global.sparDBUser $ }}'
+      secret: '{{ tpl .Values.global.sparDBSecret $ }}'
+      secretUserPasswordKey: '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
+
+# Provisions the SPAR OIDC client in Keycloak. The Job is idempotent: it
+# creates the realm if absent and adds the client, leaving anything that
+# already exists untouched. For each confidential client it also creates a
+# K8s Secret named after the clientId (key: client_secret) with an
+# auto-generated password — this is the Secret the mapper API consumes via
+# global.authClientSecret / global.authClientSecretKey above.
+# NOTE: realm/clientId reference the global.* values (the only values visible
+# to a subchart) so they are defined once and never duplicated here.
+keycloak-init:
+  enabled: true
+  keycloak:
+    # Internal cluster URL of the Keycloak installed in this namespace.
+    url: 'http://commons-keycloak:80'
+    user: 'admin'
+    password: ''
+    # The Keycloak chart's auto-created admin secret (<commons-release>-keycloak).
+    existingSecret: 'commons-keycloak'
+    existingSecretKey: 'admin-password'
+  realms:
+    '{{ tpl .Values.global.keycloakRealm $ }}':
+      clients:
+        - clientId: '{{ tpl .Values.global.authClientId $ }}'
+          name: OpenG2P SPAR
+          # Confidential service-to-service client (OAuth2 client_credentials):
+          # the mapper API exchanges client id + secret for a token. It has no
+          # browser login flow, so no redirect URIs / web origins are needed.
+          redirectUris: []
+          webOrigins: []
+
+sparMapperAPI:
+  enabled: true
+  sparHostname: spar.trial.openg2p.net
+  postgresql:
+    enabled: false
+  replicaCount: 1
+  image:
+    repository: openg2p/openg2p-spar-mapper-partner-api
+    pullPolicy: Always
+    tag: "2.1.0"
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  envVars:
+    SPAR_MAPPER_PARTNER_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
+    SPAR_MAPPER_PARTNER_API_OAUTH_TOKEN_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
+    SPAR_MAPPER_PARTNER_API_OAUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
+    SPAR_MAPPER_PARTNER_API_JWT_VERIFY_URL: 'http://{{ .Values.global.keymanagerInstallationName }}/v1/keymanager/jwtVerify'
+    SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
+    SPAR_MAPPER_PARTNER_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
+    SPAR_MAPPER_PARTNER_API_OPENAPI_ROOT_PATH: "/api/mapper"
+  envVarsFrom:
+    SPAR_MAPPER_PARTNER_API_DB_PASSWORD:
+      secretKeyRef:
+        name: '{{ tpl .Values.global.sparDBSecret $ }}'
+        key:  '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
+    SPAR_MAPPER_PARTNER_API_OAUTH_CLIENT_SECRET:
+      secretKeyRef:
+        name: '{{ tpl .Values.global.authClientSecret $ }}'
+        key: '{{ tpl .Values.global.authClientSecretKey $ }}'
+
+  containerPort: 8000
+  service:
+    type: ClusterIP
+    port: 80
+  resources: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 1
+    targetCPUUtilizationPercentage: 80
+  readinessProbe:
+    httpGet:
+      path: /ping
+      port: 8000
+    failureThreshold: 20
+    periodSeconds: 30
+    timeoutSeconds: 10
+    initialDelaySeconds: 30
+  livenessProbe:
+    httpGet:
+      path: /ping
+      port: 8000
+    initialDelaySeconds: 15
+    periodSeconds: 60
+    failureThreshold: 5
+  startupProbe:
+    enabled: true
+    httpGet:
+      path: /ping
+      port: 8000
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+  serviceAccount:
+    create: false
+    annotations: {}
+    name: ""
+  podAnnotations:
+    helm.sh/revision: '{{ .Release.Revision }}'
+  podSecurityContext: {}
+  containerSecurityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  updateStrategy:
+    type: RollingUpdate
+  command: []
+  args: []
+  postgresCheckerInit:
+    enabled: true
+    image: jbergknoff/postgresql-client
+    command:
+    - 'sh'
+    - '-c'
+    - 'until pg_isready -U ${SPAR_MAPPER_PARTNER_API_DB_USERNAME} -h ${SPAR_MAPPER_PARTNER_API_DB_HOSTNAME} -p ${SPAR_MAPPER_PARTNER_API_DB_PORT:-5432} -d ${SPAR_MAPPER_PARTNER_API_DB_DBNAME:-spar_db}; do sleep 3; done'
+  ingress:
+    enabled: false
+    className: ""
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      kubernetes.io/ingress.class: nginx
+    hosts:
+      - host: ""
+        paths:
+          - path: /api/mapper(/|$)(.*)
+            pathType: ImplementationSpecific
+    tls: []
+  istio:
+    enabled: true
+    virtualservice:
+      enabled: true
+      host: ""
+      gateway: "internal"
+      destination: '{{ include "common.names.fullname" $ }}-mapper-api'
+      destinationPort: '{{ .Values.service.port }}'
+      prefix: /api/mapper/
+      rewriteUri: "/"
+    gateway:
+      enabled: false
+      host: ""
+      ingressController:
+        istio: ingressgateway
+      httpTlsRedirect: true
+      httpEnabled: true
+      httpsEnabled: false
+      tls:
+        mode: SIMPLE
+        credentialName: ""
+
+benePortalAPI:
+  enabled: true
+  benePortalHostname: beneficiary.trial.openg2p.org
+  replicaCount: 1
+  image:
+    repository: openg2p/openg2p-spar-bene-portal-api
+    pullPolicy: Always
+    tag: "2.1.0"
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  envVars:
+    SPAR_BENE_PORTAL_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
+    SPAR_BENE_PORTAL_API_DB_PORT: '5432'
+    SPAR_BENE_PORTAL_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
+    SPAR_BENE_PORTAL_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
+  envVarsFrom:
+    SPAR_BENE_PORTAL_API_DB_PASSWORD:
+      secretKeyRef:
+        name: '{{ tpl .Values.global.sparDBSecret $ }}'
+        key: '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
+  containerPort: 8000
+  service:
+    type: ClusterIP
+    port: 80
+  resources: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 1
+    targetCPUUtilizationPercentage: 80
+  readinessProbe:
+    httpGet:
+      path: /ping
+      port: 8000
+    failureThreshold: 20
+    periodSeconds: 30
+    timeoutSeconds: 10
+    initialDelaySeconds: 30
+  livenessProbe:
+    httpGet:
+      path: /ping
+      port: 8000
+    initialDelaySeconds: 15
+    periodSeconds: 60
+    failureThreshold: 5
+  startupProbe:
+    enabled: true
+    httpGet:
+      path: /ping
+      port: 8000
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+  serviceAccount:
+    create: false
+    annotations: {}
+    name: ""
+  podAnnotations:
+    helm.sh/revision: '{{ .Release.Revision }}'
+  podSecurityContext: {}
+  containerSecurityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  updateStrategy:
+    type: RollingUpdate
+  command: []
+  args: []
+  postgresCheckerInit:
+    enabled: true
+    image: jbergknoff/postgresql-client
+    command:
+    - 'sh'
+    - '-c'
+    - 'until pg_isready -U ${SPAR_BENE_PORTAL_API_DB_USERNAME} -h ${SPAR_BENE_PORTAL_API_DB_HOSTNAME} -p ${SPAR_BENE_PORTAL_API_DB_PORT:-5432} -d ${SPAR_BENE_PORTAL_API_DB_DBNAME:-spardb}; do sleep 3; done'
+  ingress:
+    enabled: false
+    className: ""
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      kubernetes.io/ingress.class: nginx
+    hosts:
+      - host: ""
+        paths:
+          - path: /api/bene-portal(/|$)(.*)
+            pathType: ImplementationSpecific
+    tls: []
+  istio:
+    enabled: true
+    virtualservice:
+      enabled: true
+      host: ""
+      gateway: "internal"
+      destination: '{{ include "common.names.fullname" $ }}-bene-portal-api'
+      destinationPort: '{{ .Values.service.port }}'
+      prefix: /api/bene-portal/
+      rewriteUri: "/"
+    gateway:
+      enabled: false
+      host: ""
+      ingressController:
+        istio: ingressgateway
+      httpTlsRedirect: true
+      httpEnabled: true
+      httpsEnabled: false
+      tls:
+        mode: SIMPLE
+        credentialName: ""

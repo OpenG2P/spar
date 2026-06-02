@@ -1,0 +1,3 @@
+charts/*.tgz
+charts/keymanager*
+Chart.lock

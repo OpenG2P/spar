@@ -1,0 +1,21 @@
+apiVersion: v2
+name: spar
+description: A Helm chart for OpenG2P SPAR
+type: application
+version: 0.0.0-develop
+dependencies:
+- name: common
+  repository: https://openg2p.github.io/openg2p-helm
+  version: 2.30.0
+- name: postgres-init
+  version: 0.0.0-develop
+  repository: https://openg2p.github.io/openg2p-helm
+  condition: postgres-init.enabled
+- name: keycloak-init
+  version: 1.1.1
+  repository: https://openg2p.github.io/openg2p-helm
+  condition: keycloak-init.enabled
+icon: https://openg2p.github.io/openg2p-helm/openg2p-logo.png
+annotations:
+  catalog.cattle.io/display-name: "OpenG2P SPAR"
+  openg2p.org/add-to-rancher: ""

@@ -1,0 +1,88 @@
+{{- $values := index .Values "benePortalAPI" -}}
+{{- $global := .Values.global -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.names.fullname" $ }}-bene-portal-api
+  labels:
+    {{- include "beneportal.labels" . | nindent 4 }}
+spec:
+  {{- if not $values.autoscaling.enabled }}
+  replicas: {{ $values.replicaCount }}
+  {{- end }}
+  {{- with $values.updateStrategy }}
+  strategy: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "beneportal.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- if $values.podAnnotations }}
+      annotations: {{- include "beneportal.tpl" (dict "value" $values.podAnnotations "context" $) | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "beneportal.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with $values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "beneportal.serviceAccountName" . }}
+      {{- with $values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if $values.postgresCheckerInit.enabled }}
+        - name: postgres-checker
+          image: {{ $values.postgresCheckerInit.image }}
+          command:
+            {{- toYaml $values.postgresCheckerInit.command | nindent 12 }}
+          env: {{- include "beneportal.envVars" . | nindent 12 }}
+        {{- end }}
+      containers:
+        - name: "openg2p-spar-bene-portal-api"
+          {{- with $values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ $values.image.repository }}:{{ $values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ $values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $values.containerPort }}
+              protocol: TCP
+          env: {{- include "beneportal.envVars" . | nindent 12 }}
+          {{- with $values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

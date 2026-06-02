@@ -1,0 +1,36 @@
+# Root-level ignores for the consolidated spar repo.
+# Each sub-project (core/, docker/, deployment/) also keeps its own .gitignore.
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+*.swp
+
+# IDEs
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Environments / secrets
+.env
+.secrets.*
+
+# Helm chart dependencies (vendored subcharts are fetched at package time)
+**/charts/*.tgz
+Chart.lock

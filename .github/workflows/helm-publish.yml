@@ -1,0 +1,106 @@
+name: Publish SPAR Helm chart
+
+# Publishes the consolidated spar chart under deployment/charts/.
+# Triggered when the charts (or this workflow) change; each chart that exists
+# under deployment/charts/ is packaged and pushed to the openg2p-helm repo.
+on:
+  push:
+    tags:
+      - '**'
+    branches-ignore:
+      - main
+    paths:
+      - 'deployment/charts/**'
+      - '.github/workflows/helm-publish.yml'
+  workflow_dispatch:
+
+env:
+  CHARTS_DIR: deployment/charts
+
+jobs:
+  generate-charts:
+    runs-on: ubuntu-latest
+    env:
+      SKIP: 'FALSE'
+      RANCHER_CHART_FILTER: "openg2p.org/add-to-rancher"
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Package charts
+      run: |
+        # Publish every chart that actually exists under deployment/charts/.
+        # (Enumerating real chart dirs is robust to renames/deletions and to
+        # tag pushes, unlike a changed-files diff.)
+        RANCHER_CHARTS=()
+        published=0
+        for chartdir in "$CHARTS_DIR"/*/; do
+          [ -f "${chartdir}Chart.yaml" ] || continue
+          chartname=$(basename "${chartdir%/}")
+          echo "Packaging chart: $chartname"
+          helm dep up "$CHARTS_DIR/$chartname"
+          helm package "$CHARTS_DIR/$chartname"
+          published=$((published + 1))
+          is_rancher_chart=$(grep "$RANCHER_CHART_FILTER" "$CHARTS_DIR/$chartname/Chart.yaml" || true)
+          if [ -n "$is_rancher_chart" ]; then
+            RANCHER_CHARTS+=("$chartname")
+          fi
+        done
+
+        if [ "$published" -eq 0 ]; then
+          echo "::warning::No charts found to publish";
+          echo "SKIP=TRUE" >> $GITHUB_ENV
+        fi
+        echo "RANCHER_CHARTS=${RANCHER_CHARTS[@]}" >> $GITHUB_ENV
+
+        shopt -s nocasematch
+        if [[ '${{ github.repository_owner }}' != 'OpenG2P' ]]; then
+          echo "SKIP=TRUE" >> $GITHUB_ENV
+        fi
+    - name: Upload tar as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+          name: charts
+          path: ./*.tgz
+      if: env.SKIP != 'TRUE'
+
+    - name: Checkout branch for publishing
+      uses: actions/checkout@v3
+      with:
+          repository: 'openg2p/openg2p-helm'
+          ref: gh-pages
+          token: ${{ secrets.OPENG2P_BOT_GITHUB_PAT }}
+      if: env.SKIP != 'TRUE'
+
+    - name: Download tar from Artifacts
+      uses: actions/download-artifact@v4
+      with:
+          name: charts
+          path: ./
+      if: env.SKIP != 'TRUE'
+
+    - name: Update index.yaml
+      run: |
+        helm repo index .
+        for chartname in $RANCHER_CHARTS; do
+          cp ${chartname}*.tgz rancher/
+        done
+        helm repo index --url ../ --merge rancher/index.yaml rancher
+        for chartname in $RANCHER_CHARTS; do
+          rm rancher/${chartname}*.tgz || true
+        done
+      if: env.SKIP != 'TRUE'
+
+    - name: Commit Changes to repository
+      uses: EndBug/add-and-commit@v7
+      with:
+        branch: gh-pages
+        author_name: openg2pbot
+        author_email: bot@openg2p.org
+        default_author: user_info
+        message: 'added spar helm charts for publish ${{ github.repository }}@${{ github.sha }}'
+        add: './*.tgz ./index.yaml rancher/index.yaml'
+      if: env.SKIP != 'TRUE'

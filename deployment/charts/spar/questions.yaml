@@ -1,0 +1,47 @@
+questions:
+# SPAR Partner API 
+- variable: sparHostname
+  description: Hostname for all SPAR services
+  type: string
+  label: SPAR Hostname
+
+# Beneficary portal API
+- variable: benePortalAPI.benePortalHostname
+  description: Hostname for Beneficiary Portal
+  type: string
+  label: Beneficiary Portal Hostname
+
+# eSignet
+- variable: esignetBaseUrl
+  description: Base URL of eSignet for authentication
+  type: string
+  label: eSignet Base URL
+
+# Keycloak
+- variable: keycloakBaseUrl
+  description: Keycloak base URL for client authentication
+  type: string
+  label: Keycloak Base URL
+
+- variable: sparAuthClientId
+  description: OIDC client ID
+  type: string
+  label: OIDC Client ID
+
+- variable: sparAuthClientSecret
+  description: OIDC client Kuberenetes secret name
+  type: string
+  label: OIDC Client Secret Name
+
+- variable: sparAuthClientSecretKey
+  description: Key containing OIDC client password
+  type: string
+  label: OIDC Client Secret Key
+
+# Keymanager
+- variable: keymanagerInstallationName
+  description: |-
+    Internal service name of Keymanager
+  type: reference_service
+  label: Keymanager Service Name
+  group: Keymanager Settings

@@ -1,0 +1,17 @@
+{{- $values := index .Values "benePortalAPI" -}}
+{{- $global := .Values.global -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.names.fullname" $ }}-bene-portal-api
+  labels:
+    {{- include "beneportal.labels" . | nindent 4 }}
+spec:
+  type: {{ $values.service.type }}
+  ports:
+    - port: {{ $values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "beneportal.selectorLabels" . | nindent 4 }}

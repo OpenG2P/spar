@@ -1,0 +1,17 @@
+# Build context for the API images is the repo root; keep it lean.
+# (Only core/ and the relevant docker/spar-apis/* Dockerfile are needed.)
+# NOTE: `*.md` only matches the repo-root README-style files. Per-package
+# README.md files under core/* are intentionally NOT matched (no `**/`),
+# because each package's pyproject declares `readme = "README.md"`.
+.git
+.github
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.DS_Store
+*.md
+
+# Unrelated to the API image builds
+deployment/
