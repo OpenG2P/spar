@@ -81,9 +81,17 @@ sparMapperAPI:
   fullnameOverride: ""
   envVars:
     SPAR_MAPPER_PARTNER_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
-    SPAR_MAPPER_PARTNER_API_OAUTH_TOKEN_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
-    SPAR_MAPPER_PARTNER_API_OAUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
-    SPAR_MAPPER_PARTNER_API_JWT_VERIFY_URL: 'http://{{ .Values.global.keymanagerInstallationName }}/v1/keymanager/jwtVerify'
+    # Keymanager (request signature verify / sign). The app's KeymanagerCryptoHelper
+    # reads these KEYMANAGER_* settings and appends /jwtVerify and /jwtSign to the
+    # base URL itself, so this must be the base path (no /jwtVerify suffix).
+    SPAR_MAPPER_PARTNER_API_KEYMANAGER_API_BASE_URL: 'http://{{ .Values.global.keymanagerInstallationName }}/v1/keymanager'
+    SPAR_MAPPER_PARTNER_API_KEYMANAGER_SIGN_APP_ID: 'OPENG2P_SPAR'
+    # Keymanager is reached over its in-cluster Service, which does not enforce OAuth,
+    # so auth is disabled. To enable, set this 'true'; AUTH_URL / CLIENT_ID / the
+    # CLIENT_SECRET in envVarsFrom below are already wired for that case.
+    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_ENABLED: 'false'
+    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
+    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
     SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
     SPAR_MAPPER_PARTNER_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
     SPAR_MAPPER_PARTNER_API_OPENAPI_ROOT_PATH: "/api/mapper"
@@ -92,7 +100,7 @@ sparMapperAPI:
       secretKeyRef:
         name: '{{ tpl .Values.global.sparDBSecret $ }}'
         key:  '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
-    SPAR_MAPPER_PARTNER_API_OAUTH_CLIENT_SECRET:
+    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_SECRET:
       secretKeyRef:
         name: '{{ tpl .Values.global.authClientSecret $ }}'
         key: '{{ tpl .Values.global.authClientSecretKey $ }}'
