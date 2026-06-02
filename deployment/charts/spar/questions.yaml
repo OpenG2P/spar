@@ -1,47 +1,59 @@
 questions:
-# SPAR Partner API
-- variable: sparHostname
-  description: Hostname for all SPAR services
+# ----------------------------- Hostnames -----------------------------
+- variable: sparMapperAPI.sparHostname
+  description: Hostname for the SPAR Mapper API
   type: string
-  label: SPAR Hostname
+  label: SPAR Mapper API Hostname
+  group: Hostnames
 
-# Beneficary portal API
 - variable: benePortalAPI.benePortalHostname
-  description: Hostname for Beneficiary Portal
+  description: Hostname for the SPAR Beneficiary Portal API
   type: string
   label: Beneficiary Portal Hostname
+  group: Hostnames
 
-# eSignet
-- variable: esignetBaseUrl
-  description: Base URL of eSignet for authentication
-  type: string
-  label: eSignet Base URL
+# ----------------------------- Keycloak ------------------------------
+- variable: keycloak-init.enabled
+  description: Provision the SPAR OIDC client in Keycloak via the keycloak-init job
+  type: boolean
+  default: true
+  label: Enable Keycloak Init
+  group: Keycloak
 
-# Keycloak
-- variable: keycloakBaseUrl
-  description: Keycloak base URL for client authentication
+- variable: global.keycloakBaseUrl
+  description: Public (namespace-scoped) Keycloak base URL used by apps for the OIDC issuer/token URL
   type: string
   label: Keycloak Base URL
+  group: Keycloak
 
-- variable: sparAuthClientId
-  description: OIDC client ID
+- variable: global.keycloakRealm
+  description: Keycloak realm in which the SPAR client is provisioned and tokens are issued
+  type: string
+  label: Keycloak Realm
+  group: Keycloak
+
+- variable: global.authClientId
+  description: OIDC client ID (must match the client provisioned by keycloak-init)
   type: string
   label: OIDC Client ID
+  group: Keycloak
 
-- variable: sparAuthClientSecret
-  description: OIDC client Kuberenetes secret name
+- variable: global.authClientSecret
+  description: Kubernetes secret name holding the OIDC client password
   type: string
   label: OIDC Client Secret Name
+  group: Keycloak
 
-- variable: sparAuthClientSecretKey
-  description: Key containing OIDC client password
+- variable: global.authClientSecretKey
+  description: Key within the secret containing the OIDC client password
   type: string
   label: OIDC Client Secret Key
+  group: Keycloak
 
-# Keymanager
-- variable: keymanagerInstallationName
+# ----------------------------- Keymanager ----------------------------
+- variable: global.keymanagerInstallationName
   description: |-
     Internal service name of Keymanager
   type: reference_service
   label: Keymanager Service Name
-  group: Keymanager Settings
+  group: Keymanager

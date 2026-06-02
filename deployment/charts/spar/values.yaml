@@ -68,7 +68,7 @@ keycloak-init:
 
 sparMapperAPI:
   enabled: true
-  sparHostname: spar.trial.openg2p.net
+  sparHostname: spar.trial.openg2p.org
   postgresql:
     enabled: false
   replicaCount: 1

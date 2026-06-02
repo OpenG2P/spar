@@ -1,6 +1,6 @@
 apiVersion: v2
-name: spar
-description: A Helm chart for OpenG2P SPAR
+name: openg2p-spar
+description: A Helm chart for OpenG2P SPAR - June 2026 Edition
 type: application
 version: 0.0.0-develop
 dependencies:
