@@ -1,6 +1,7 @@
 import logging
 from typing import Union
 
+from openg2p_fastapi_common.config import Settings
 from openg2p_fastapi_common.service import BaseService
 from openg2p_spar_models.schemas import (
     LinkRequest,
@@ -21,6 +22,12 @@ class RequestValidation(BaseService):
         print("RequestValidation initialized")
 
     def validate_signature(self, is_signature_valid) -> None:
+        if not getattr(
+            Settings.get_config(strict=False), "jwt_auth_enabled", True
+        ):
+            _logger.info("JWT auth disabled; skipping signature validation")
+            return None
+
         _logger.info("Validating signature")
         if not is_signature_valid:
             _logger.error("Invalid JWT signature")

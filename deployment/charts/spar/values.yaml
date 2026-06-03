@@ -128,6 +128,8 @@ sparMapperAPI:
     # so auth is disabled. To enable, set this 'true'; AUTH_URL / CLIENT_ID / the
     # CLIENT_SECRET in envVarsFrom below are already wired for that case.
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_ENABLED: 'false'
+    # Partner request Signature JWT verification. Set 'true' in production.
+    SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: 'false'
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
     SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
