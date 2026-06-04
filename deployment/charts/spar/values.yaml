@@ -103,6 +103,17 @@ seedData:
       strategy_type: FA
       construct_strategy: 'mobile_number:{mobile_number}.wallet_provider_name:{wallet_provider_name}.wallet_provider_code:{wallet_provider_code}.fa_type:{fa_type}'
       deconstruct_strategy: '^mobile_number:(?P<mobile_number>.*)\.wallet_provider_name:(?P<wallet_provider_name>.*)\.wallet_provider_code:(?P<wallet_provider_code>.*)\.fa_type:(?P<fa_type>.*)$'
+    # Bank FA serialized in the exact shape the G2P Bridge expects
+    # (G2P_BRIDGE_CELERY_WORKERS_BANK_FA_DECONSTRUCT_STRATEGY):
+    #   account_number:<a>.branch_code:<b>.bank_code:<c>.mobile_number:.email_address:.fa_type:BANK_ACCOUNT
+    # mobile_number / email_address are emitted empty (a bank FA has neither), and
+    # fa_type is hardcoded to BANK_ACCOUNT because the Bridge/Example-Bank route on
+    # the literal "BANK_ACCOUNT" (SPAR's FA provider enum is "BANK").
+    - id: 5
+      description: Bank (G2P Bridge)
+      strategy_type: FA
+      construct_strategy: 'account_number:{account_number}.branch_code:{branch_code}.bank_code:{bank_code}.mobile_number:.email_address:.fa_type:BANK_ACCOUNT'
+      deconstruct_strategy: '^account_number:(?P<account_number>.*)\.branch_code:(?P<branch_code>.*)\.bank_code:(?P<bank_code>.*)\.mobile_number:(?P<mobile_number>.*)\.email_address:(?P<email_address>.*)\.fa_type:(?P<fa_type>.*)$'
 
 sparMapperAPI:
   enabled: true
