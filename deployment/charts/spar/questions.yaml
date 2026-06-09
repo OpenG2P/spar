@@ -57,3 +57,33 @@ questions:
   type: reference_service
   label: Keymanager Service Name
   group: Keymanager
+
+# ----------------------------- Database ------------------------------
+- variable: global.postgresqlHost
+  description: |-
+    PostgreSQL host for the SPAR database. Defaults to the in-cluster
+    commons-postgresql. If you want to connect to an external database, provide
+    the external database IP/hostname here.
+  type: string
+  label: PostgreSQL Host
+  group: Database
+- variable: global.sparDB
+  description: SPAR database name (defaults to the release name, underscored)
+  type: string
+  label: SPAR Database
+  group: Database
+- variable: global.sparDBUser
+  description: SPAR database user (defaults to <release>_user, underscored)
+  type: string
+  label: SPAR Database User
+  group: Database
+- variable: global.sparDBSecret
+  description: Kubernetes secret holding the SPAR database user password
+  type: string
+  label: SPAR Database User Secret
+  group: Database
+- variable: global.sparDBUserPasswordKey
+  description: Key within the secret containing the SPAR database user password
+  type: string
+  label: SPAR Database User Password Key
+  group: Database
