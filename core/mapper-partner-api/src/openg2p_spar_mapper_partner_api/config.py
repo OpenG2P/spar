@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     db_port: int = 5432
     db_dbname: str = "spardb"
 
-    keymanager_sign_app_id: str = "SPAR"
-    # SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED — when false, signature validation is skipped.
+    # Inbound partner JWS signature verification (local, Keymanager-free).
+    # SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED — when false, signature validation
+    # is skipped entirely. When true, each request must carry a detached JWS in the
+    # "Signature" header, verified against the partner's public key loaded from
+    # partner_keys_dir (one JWKS file per partner, named PARTNER_<MNEMONIC>.json).
+    # The G2P Bridge calls SPAR as sender_app_mnemonic=g2p_bridge -> PARTNER_G2P_BRIDGE.
     jwt_auth_enabled: bool = False
+    partner_keys_dir: str = "/etc/spar/partner-keys"
+    # Comma-separated allowed JWS algorithms. RS256 only (asymmetric); "none" and
+    # HMAC (HS*) are always rejected regardless of this list.
+    signature_allowed_algorithms: str = "RS256"

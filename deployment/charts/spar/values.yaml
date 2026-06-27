@@ -6,8 +6,6 @@ global:
   sparDBUserPasswordKey: '{{ .Release.Name }}-db-user'
 
   # Security & Authentication
-  # Internal service name of Keymanager
-  keymanagerInstallationName: commons-services-keymanager
   # Public (namespace-scoped) Keycloak hostname used by apps for the OIDC
   # issuer/token URL. The keycloak-init Job below talks to the same Keycloak
   # over its internal cluster URL.
@@ -21,6 +19,49 @@ global:
   authClientSecret: '{{ tpl .Values.global.authClientId $ }}'
   # Key inside the secret containing the client password
   authClientSecretKey: 'client_secret'
+
+  # Beneficiary Portal authenticates BENEFICIARIES against a SEPARATE Keycloak
+  # realm — NOT the staff/agent realm — because beneficiaries are a distinct user
+  # population from staff/agents. keycloak-init below creates this realm and the
+  # portal's public OIDC client.
+  keycloakBeneficiaryRealm: 'beneficiary'
+  keycloakBeneficiaryIssuerUrl: '{{ tpl .Values.global.keycloakBaseUrl $ }}/realms/{{ tpl .Values.global.keycloakBeneficiaryRealm $ }}'
+  # Public hostname of the Beneficiary Portal (the OIDC redirect-URI host).
+  benePortalHostname: 'beneficiary.{{ .Release.Namespace }}.openg2p.org'
+  # Public (SPA / browser-login) OIDC client for the Beneficiary Portal, created
+  # in the beneficiary realm.
+  benePortalAuthClientId: 'spar-bene-portal'
+
+  # Inbound partner JWS signature verification (local, Keymanager-free). When
+  # true, every Mapper Partner API request must carry a valid detached JWS in the
+  # "Signature" header, verified in-process against the partner's public key.
+  # Partner keys are mounted from a Secret (one JWKS file per partner, named
+  # PARTNER_<MNEMONIC>.json). The G2P Bridge calls SPAR as
+  # sender_app_mnemonic=g2p_bridge -> PARTNER_G2P_BRIDGE.
+  sparSignatureValidationEnabled: false
+  sparPartnerKeysDir: /etc/spar/partner-keys
+  sparPartnerKeysSecret: '{{ .Release.Name }}-partner-keys'
+  # RS256 only (asymmetric); "none" and HMAC (HS*) are always rejected.
+  sparSignatureAllowedAlgorithms: "RS256"
+
+  # TEST/DEMO trial profile. When true (the default for the bundled trial
+  # install), the chart onboards the well-known TEST-ONLY G2P Bridge key (see the
+  # testPartner block below) AND turns signature validation ON, so a trial G2P
+  # Bridge signing its resolve requests is verified out of the box. The test key
+  # is committed in the bridge repo, so set this false for any real deployment.
+  testPartnerEnabled: true
+
+# TEST/DEMO ONLY — gated by global.testPartnerEnabled. Onboards the well-known
+# TEST-ONLY G2P Bridge public key (mirrors the bridge repo's test/keys) as
+# PARTNER_G2P_BRIDGE, so a trial G2P Bridge — signing its resolve requests with the
+# matching private key — is verified out of the box. The private key is public
+# knowledge (committed in the bridge repo), so NEVER enable in production: set
+# global.testPartnerEnabled=false and onboard real partner public keys.
+testPartner:
+  # The G2P Bridge calls SPAR with sender_app_mnemonic "g2p_bridge" -> PARTNER_G2P_BRIDGE.
+  mnemonics:
+    - G2P_BRIDGE
+  publicJwk: '{"n":"x58O6HUXdeDradiCZpE8ZRGH8VYsRAHfdur6HRd5-HEyGXSltRHuJyWmm67W7psIExrTURFTAbE86EO1pZqefOElsbW_B008n4H5OCoxajXiLaxftvJKQuB7D9UrACkLazMJAJbWK1nfMhYAoya_JyYZ3CAk9TsRC35hcUmoqWd5zl1cwcss2CQzehF4FqicLqfoTibldLpMkpsLcnJywJux77uIhcvDE-S1CAvl8WEfORoXw_5D5zXDdL_Kbcv_czj_683pa4-fTAnwFk8k-JIpv4GDZnNresC3iTPr_QEzZ8ilJMrWeJtJUBvv1_JUwbTLLKVzsBta1r5pdfzk_Q","e":"AQAB","kid":"test-partner-2026","alg":"RS256","use":"sig","kty":"RSA"}'
 
 postgres-init:
   enabled: true
@@ -56,6 +97,7 @@ keycloak-init:
     existingSecret: 'commons-keycloak'
     existingSecretKey: 'admin-password'
   realms:
+    # Staff realm (shared, commons layer) — holds the mapper API's service client.
     '{{ tpl .Values.global.keycloakRealm $ }}':
       clients:
         - clientId: '{{ tpl .Values.global.authClientId $ }}'
@@ -65,6 +107,22 @@ keycloak-init:
           # browser login flow, so no redirect URIs / web origins are needed.
           redirectUris: []
           webOrigins: []
+    # Dedicated BENEFICIARY realm — a separate user population from staff/agents.
+    # keycloak-init creates the realm if absent and adds the portal's public
+    # (browser-login) OIDC client.
+    '{{ tpl .Values.global.keycloakBeneficiaryRealm $ }}':
+      clients:
+        - clientId: '{{ tpl .Values.global.benePortalAuthClientId $ }}'
+          name: SPAR Beneficiary Portal
+          # Public SPA client (Authorization Code + PKCE in the browser) — not a
+          # confidential client, so no client secret.
+          publicClient: true
+          # Host-scoped redirect URIs — restricted to the Beneficiary Portal's
+          # public hostname (root, OIDC callback, post-login). Never a bare "*".
+          redirectUris:
+            - 'https://{{ tpl .Values.global.benePortalHostname $ }}/*'
+          webOrigins:
+            - 'https://{{ tpl .Values.global.benePortalHostname $ }}'
 
 # Seeds shared SPAR reference data (the `strategy` table) at install/upgrade via
 # a post-install/post-upgrade Job. Seeding is ADDITIVE and IDEMPOTENT: each row
@@ -130,19 +188,11 @@ sparMapperAPI:
   fullnameOverride: ""
   envVars:
     SPAR_MAPPER_PARTNER_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
-    # Keymanager (request signature verify / sign). The app's KeymanagerCryptoHelper
-    # reads these KEYMANAGER_* settings and appends /jwtVerify and /jwtSign to the
-    # base URL itself, so this must be the base path (no /jwtVerify suffix).
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_API_BASE_URL: 'http://{{ .Values.global.keymanagerInstallationName }}/v1/keymanager'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_SIGN_APP_ID: 'OPENG2P_SPAR'
-    # Keymanager is reached over its in-cluster Service, which does not enforce OAuth,
-    # so auth is disabled. To enable, set this 'true'; AUTH_URL / CLIENT_ID / the
-    # CLIENT_SECRET in envVarsFrom below are already wired for that case.
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_ENABLED: 'false'
-    # Partner request Signature JWT verification. Set 'true' in production.
-    SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: 'false'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
+    # Inbound partner JWS signature verification (local, Keymanager-free). On when
+    # explicitly enabled OR when the trial test partner (G2P Bridge) is onboarded.
+    SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: '{{ or .Values.global.sparSignatureValidationEnabled .Values.global.testPartnerEnabled }}'
+    SPAR_MAPPER_PARTNER_API_PARTNER_KEYS_DIR: '{{ .Values.global.sparPartnerKeysDir }}'
+    SPAR_MAPPER_PARTNER_API_SIGNATURE_ALLOWED_ALGORITHMS: '{{ .Values.global.sparSignatureAllowedAlgorithms }}'
     SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
     SPAR_MAPPER_PARTNER_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
     SPAR_MAPPER_PARTNER_API_OPENAPI_ROOT_PATH: "/api/mapper"
@@ -151,10 +201,6 @@ sparMapperAPI:
       secretKeyRef:
         name: '{{ tpl .Values.global.sparDBSecret $ }}'
         key:  '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_SECRET:
-      secretKeyRef:
-        name: '{{ tpl .Values.global.authClientSecret $ }}'
-        key: '{{ tpl .Values.global.authClientSecretKey $ }}'
 
   containerPort: 8000
   service:
@@ -249,7 +295,7 @@ sparMapperAPI:
 
 benePortalAPI:
   enabled: true
-  benePortalHostname: beneficiary.trial.openg2p.org
+  benePortalHostname: '{{ tpl .Values.global.benePortalHostname $ }}'
   replicaCount: 1
   image:
     repository: openg2p/openg2p-spar-bene-portal-api
@@ -263,6 +309,13 @@ benePortalAPI:
     G2P_SPAR_BENE_PORTAL_API_DB_PORT: '5432'
     G2P_SPAR_BENE_PORTAL_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
     G2P_SPAR_BENE_PORTAL_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
+    # Beneficiary authentication — validate access tokens issued by the dedicated
+    # BENEFICIARY realm (not staff/agent). Issuer + JWKS point at that realm; the
+    # accepted audience is the beneficiary-portal OIDC client.
+    G2P_SPAR_BENE_PORTAL_API_AUTH_ENABLED: 'true'
+    G2P_SPAR_BENE_PORTAL_API_AUTH_DEFAULT_ISSUERS: '["{{ tpl .Values.global.keycloakBeneficiaryIssuerUrl $ }}"]'
+    G2P_SPAR_BENE_PORTAL_API_AUTH_DEFAULT_JWKS_URLS: '["{{ tpl .Values.global.keycloakBeneficiaryIssuerUrl $ }}/protocol/openid-connect/certs"]'
+    G2P_SPAR_BENE_PORTAL_API_AUTH_DEFAULT_AUDIENCES: '["{{ tpl .Values.global.benePortalAuthClientId $ }}"]'
   envVarsFrom:
     G2P_SPAR_BENE_PORTAL_API_DB_PASSWORD:
       secretKeyRef:

@@ -86,3 +86,15 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          # Partner public keys for inbound signature verification (read-only),
+          # mounted from a Secret. optional:true lets the API start when the mount
+          # is absent (validation off / partners not yet onboarded).
+          volumeMounts:
+            - name: partner-keys
+              mountPath: {{ $global.sparPartnerKeysDir | quote }}
+              readOnly: true
+      volumes:
+        - name: partner-keys
+          secret:
+            secretName: {{ tpl $global.sparPartnerKeysSecret $ }}
+            optional: true

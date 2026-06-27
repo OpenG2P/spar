@@ -7,7 +7,6 @@ from .config import Settings
 _config = Settings.get_config()
 
 from openg2p_fastapi_common.app import Initializer as BaseInitializer
-from openg2p_fastapi_common.utils.crypto import KeymanagerCryptoHelper
 from openg2p_fastapi_partner_auth.jwt_validation_helper import JWTValidationHelper
 from openg2p_spar_mapper_core.helpers import ResponseHelper, StrategyHelper
 from openg2p_spar_mapper_core.services import (
@@ -15,6 +14,7 @@ from openg2p_spar_mapper_core.services import (
     MapperService,
     RequestValidation,
 )
+from openg2p_spar_models.crypto import PyJWTCryptoHelper
 from openg2p_spar_models.models import IdFaMapping, Strategy
 
 from .controllers import MapperController
@@ -32,7 +32,14 @@ class Initializer(BaseInitializer):
         MapperService()
         ResponseHelper()
         JWTValidationHelper()
-        KeymanagerCryptoHelper()
+        PyJWTCryptoHelper(
+            partner_keys_dir=_config.partner_keys_dir,
+            allowed_algorithms=[
+                alg.strip()
+                for alg in _config.signature_allowed_algorithms.split(",")
+                if alg.strip()
+            ],
+        )
 
         MapperController().post_init()
 

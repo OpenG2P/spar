@@ -19,7 +19,9 @@ dependencies = [
     "openg2p-fastapi-common",
     "gunicorn ~=22.0.0",
     "asyncpg",
-    "psycopg2"
+    "psycopg2",
+    "PyJWT[crypto] >=2.8.0",
+    "orjson"
 ]
 dynamic = ["version"]
 

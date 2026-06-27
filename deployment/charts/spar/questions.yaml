@@ -32,6 +32,19 @@ questions:
   label: Keycloak Realm
   group: Keycloak
 
+- variable: global.keycloakBeneficiaryRealm
+  description: Dedicated Keycloak realm for Beneficiary Portal users (separate from staff/agent)
+  type: string
+  default: beneficiary
+  label: Beneficiary Realm
+  group: Keycloak
+- variable: global.benePortalAuthClientId
+  description: Public OIDC client ID for the Beneficiary Portal (created in the beneficiary realm)
+  type: string
+  default: spar-bene-portal
+  label: Beneficiary Portal Client ID
+  group: Keycloak
+
 - variable: global.authClientId
   description: OIDC client ID (must match the client provisioned by keycloak-init)
   type: string
@@ -50,13 +63,25 @@ questions:
   label: OIDC Client Secret Key
   group: Keycloak
 
-# ----------------------------- Keymanager ----------------------------
-- variable: global.keymanagerInstallationName
-  description: |-
-    Internal service name of Keymanager
-  type: reference_service
-  label: Keymanager Service Name
-  group: Keymanager
+# --------------------------- Authentication --------------------------
+# Inbound partner signature verification is done locally (no Keymanager). Turn it
+# on only after onboarding partner public keys into the Secret below.
+- variable: global.sparSignatureValidationEnabled
+  description: Verify a partner JWS signature on every Mapper Partner API request (partners must be onboarded first)
+  type: boolean
+  default: false
+  label: Verify Partner Signatures
+  group: Authentication
+- variable: global.sparPartnerKeysSecret
+  description: Secret holding partner public keys — one JWKS file per partner, named PARTNER_<MNEMONIC>.json
+  type: string
+  label: Partner Public Keys Secret
+  group: Authentication
+- variable: global.sparSignatureAllowedAlgorithms
+  description: Comma-separated allowed JWS algorithms (RS256 only; none/HMAC always rejected)
+  type: string
+  label: Allowed Signature Algorithms
+  group: Authentication
 
 # ----------------------------- Database ------------------------------
 - variable: global.postgresqlHost
