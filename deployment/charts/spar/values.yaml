@@ -124,7 +124,7 @@ sparMapperAPI:
   image:
     repository: openg2p/openg2p-spar-mapper-partner-api
     pullPolicy: Always
-    tag: "develop"
+    tag: "1.0.0"
   imagePullSecrets: []
   nameOverride: ""
   fullnameOverride: ""
@@ -254,7 +254,7 @@ benePortalAPI:
   image:
     repository: openg2p/openg2p-spar-bene-portal-api
     pullPolicy: Always
-    tag: "develop"
+    tag: "1.0.0"
   imagePullSecrets: []
   nameOverride: ""
   fullnameOverride: ""
