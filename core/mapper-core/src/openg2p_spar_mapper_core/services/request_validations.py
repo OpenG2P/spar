@@ -22,9 +22,7 @@ class RequestValidation(BaseService):
         print("RequestValidation initialized")
 
     def validate_signature(self, is_signature_valid) -> None:
-        if not getattr(
-            Settings.get_config(strict=False), "jwt_auth_enabled", True
-        ):
+        if not getattr(Settings.get_config(strict=False), "jwt_auth_enabled", True):
             _logger.info("JWT auth disabled; skipping signature validation")
             return None
 
