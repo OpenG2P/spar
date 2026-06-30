@@ -22,6 +22,64 @@ global:
   # Key inside the secret containing the client password
   authClientSecretKey: 'client_secret'
 
+  # ── JWS signature verification (openg2p-fastapi-common) ───────────────────
+  # SPAR only VERIFIES partner signatures (it never signs), so there is no signing
+  # key / .p12. Backend:
+  #   "local"      -> in-process PyJWT; partner public certs verified from the
+  #                   partner_keys DB table (seeded below). No Keymanager. Default.
+  #   "keymanager" -> remote Keymanager service (the KEYMANAGER_* env in
+  #                   sparMapperAPI.envVars).
+  sparCryptoBackend: local
+  # RS256 only (asymmetric); "none" and HMAC (HS*) are always rejected.
+  sparCryptoAllowedAlgorithms: "RS256"
+  # Verify a partner JWS signature on every Mapper Partner API request. ON by
+  # default (the trial Bridge signs its resolve calls); set false for an
+  # unauthenticated demo.
+  sparJwtAuthEnabled: true
+
+  # Production partner onboarding (seed-based, local backend) — each entry is
+  # upserted into the partner_keys table at migrate-time. Onboard a partner by
+  # appending their public certificate here (referenceId = PARTNER_<MNEMONIC>):
+  #   sparPartnerCerts:
+  #     - referenceId: PARTNER_MY_PSP
+  #       publicKey: |
+  #         -----BEGIN CERTIFICATE-----
+  #         ...
+  #         -----END CERTIFICATE-----
+  sparPartnerCerts: []
+
+  # TEST/DEMO trial profile. Seeds the committed TEST G2P Bridge public cert so a
+  # trial Bridge — signing its resolve requests as g2p_bridge — is verified out of
+  # the box as PARTNER_G2P_BRIDGE. TEST_SANITY / TRAINING are also seeded (same
+  # key) so the Bridge's sanity suite and Postman walkthrough can call SPAR
+  # directly with that test key. The key is committed (public knowledge), so set
+  # this false for any real deployment.
+  testPartnerEnabled: true
+  testPartnerMnemonics:
+    - G2P_BRIDGE
+    - TEST_SANITY
+    - TRAINING
+  testPartnerCertPem: |
+    -----BEGIN CERTIFICATE-----
+    MIIDDzCCAfegAwIBAgIUJ5fj7XGtXGseT3bVOYPld+xhV/AwDQYJKoZIhvcNAQEL
+    BQAwFzEVMBMGA1UEAwwMdGVzdC1wYXJ0bmVyMB4XDTI2MDYzMDAxNTMyNloXDTM2
+    MDYyNzAxNTMyNlowFzEVMBMGA1UEAwwMdGVzdC1wYXJ0bmVyMIIBIjANBgkqhkiG
+    9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4J/LXhIm69gtBeht8alcQ19DzPgmSwOH/R88
+    3T6881Q/V4iGAcqbE1lK1VwO1WTP2+AWglwd73g7xDDtqZWfOzeAH5B/VlgA4vLq
+    WsmO0pdXf7BLHkhryqzMORdurV5524EUNFRiQmIaAOYzx4jwqgMocCIUPZ83j/d9
+    +0KBi3ITJ8MfCA3QEuY3+XAyY/UbpxsPeZgrrK6cG7nI226yJJ17eUAEWBNErXrw
+    YZPPmGLx2lDNi84wbZg6YDBBNiUqXqoLPU/0OI7kEGv4NatKUJLGtzAO7f09dQ1R
+    9iVMFkqZPVMsJCzfURNAqSQPWfGriZOH2c/iaZPaYzcNybS/zwIDAQABo1MwUTAd
+    BgNVHQ4EFgQUYMNUj0/e3cN9hs2z7XxsXMqBl9IwHwYDVR0jBBgwFoAUYMNUj0/e
+    3cN9hs2z7XxsXMqBl9IwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOC
+    AQEAYcn5xHkBIXYjjHUJQT9vmQmB9VKqniyOo/enNhIjitPa+ejZ9IdiFrTQFb9K
+    WrD2DtTsDyygEo3Fz+MsLvUA0PLaCvJcv45gaU/vLxYwGgN+IYqvIyAKAwZxmNz7
+    ZbrY//Zu7HEckjyRkrakVZPw6Oi1QiRpA35V8q5zvfmqFIULMI4ZhIpw0tcSyk12
+    PPX3Xyqgtb9HlWt+izJacktr71ZrfEVuMpfk4MFwW2oyTJIOYr/0vI2m0ZENL0p8
+    4ZKyP9Xydc9E9emXaC+ARzB3PrEc8Ydd9VoBSftRakRpgSEFiD9v7/NMBvJI6pJV
+    ghl9hlfFpEIHXpmFoBASweRGEg==
+    -----END CERTIFICATE-----
+
 postgres-init:
   enabled: true
   postgresql:
@@ -139,8 +197,17 @@ sparMapperAPI:
     # so auth is disabled. To enable, set this 'true'; AUTH_URL / CLIENT_ID / the
     # CLIENT_SECRET in envVarsFrom below are already wired for that case.
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_ENABLED: 'false'
-    # Partner request Signature JWT verification. Set 'true' in production.
-    SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: 'false'
+    # Partner request Signature JWT verification — ON by default (the trial Bridge
+    # signs its resolve calls). Set sparJwtAuthEnabled=false for an unsigned demo.
+    SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: '{{ .Values.global.sparJwtAuthEnabled }}'
+    # JWS backend (keymanager | local). local verifies partner certs from the
+    # partner_keys DB table (seeded from CRYPTO_PARTNER_CERTS); no signing key.
+    SPAR_MAPPER_PARTNER_API_CRYPTO_BACKEND: '{{ .Values.global.sparCryptoBackend }}'
+    SPAR_MAPPER_PARTNER_API_CRYPTO_ALLOWED_ALGORITHMS: '{{ .Values.global.sparCryptoAllowedAlgorithms }}'
+    # Seed-based partner onboarding: JSON list of partner certs upserted into the
+    # partner_keys table at migrate (operator sparPartnerCerts + trial test certs,
+    # incl. the G2P Bridge cert as PARTNER_G2P_BRIDGE).
+    SPAR_MAPPER_PARTNER_API_CRYPTO_PARTNER_CERTS: '{{ include "openg2p-spar.partnerCertsJson" . }}'
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
     SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'

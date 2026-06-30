@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # External OpenG2P library ref (not part of this repo). Override via build-arg /
 # workflow input. The SPAR code itself is installed from local source (core/).
-ARG FASTAPI_COMMON_REF=v1.1.5
+ARG FASTAPI_COMMON_REF=develop
 
 ARG container_user=openg2p
 ARG container_user_group=openg2p
