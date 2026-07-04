@@ -95,6 +95,21 @@ postgres-init:
       secret: '{{ tpl .Values.global.sparDBSecret $ }}'
       secretUserPasswordKey: '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
 
+# Re-sync the SPAR DB role password to its Secret before the app starts. postgres-init
+# only CREATEs a missing role (never updates an existing role's password), so on a
+# persistent commons-postgresql the role password can drift from the regenerated Secret
+# and the app's migrate fails to authenticate. This pre-upgrade hook fixes that
+# (idempotent; no-op when the role/secret is absent). See templates/db-password-sync.
+dbPasswordSync:
+  enabled: true
+  # Postgres superuser credentials (same source postgres-init uses).
+  superuserSecret: commons-postgresql
+  superuserPasswordKey: postgres-password
+  image:
+    repository: jbergknoff/postgresql-client
+    tag: latest
+    pullPolicy: IfNotPresent
+
 # Provisions the SPAR OIDC client in Keycloak. The Job is idempotent: it
 # creates the realm if absent and adds the client, leaving anything that
 # already exists untouched. For each confidential client it also creates a
@@ -103,8 +118,11 @@ postgres-init:
 # global.authClientSecret / global.authClientSecretKey above.
 # NOTE: realm/clientId reference the global.* values (the only values visible
 # to a subchart) so they are defined once and never duplicated here.
+# OFF by default: the openg2p-spar OIDC client is only used to authenticate the
+# Mapper API to MOSIP Keymanager, which the default local crypto backend does not
+# use. Enable only if you switch global.sparCryptoBackend to the legacy "keymanager".
 keycloak-init:
-  enabled: true
+  enabled: false
   keycloak:
     # Internal cluster URL of the Keycloak installed in this namespace.
     url: 'http://commons-keycloak:80'

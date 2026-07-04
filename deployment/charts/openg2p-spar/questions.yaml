@@ -14,10 +14,10 @@ questions:
 
 # ----------------------------- Keycloak ------------------------------
 - variable: keycloak-init.enabled
-  description: Provision the SPAR OIDC client in Keycloak via the keycloak-init job
+  description: Provision the SPAR OIDC client. Only needed for the legacy Keymanager crypto backend — leave OFF for the default local backend (SPAR verifies signatures in-process, no Keycloak).
   type: boolean
-  default: true
-  label: Enable Keycloak Init
+  default: false
+  label: Create Keycloak Client (Keymanager only)
   group: Keycloak
 
 - variable: global.keycloakBaseUrl
@@ -51,33 +51,15 @@ questions:
   group: Keycloak
 
 # ------------------------ Partner Signatures ------------------------
-# SPAR only VERIFIES partner signatures (it never signs). Partners are onboarded
-# by seeding their public cert into the partner_keys table (global.sparPartnerCerts).
-- variable: global.sparCryptoBackend
-  description: "JWS verify backend. local = in-process PyJWT (partner_keys DB, no Keymanager); keymanager = remote Keymanager service."
-  type: enum
-  options:
-    - local
-    - keymanager
-  default: local
-  label: Crypto Backend
-  group: Partner Signatures
+# SPAR VERIFIES partner signatures in-process (local JWS, RS256) — no MOSIP
+# Keymanager. Partners are onboarded by seeding their public cert into the
+# partner_keys table (global.sparPartnerCerts).
 - variable: global.sparJwtAuthEnabled
   description: Verify a partner JWS signature on every Mapper Partner API request (partners must be onboarded first via Partner Certs)
   type: boolean
   default: true
   label: Verify Partner Signatures
   group: Partner Signatures
-
-# ----------------------------- Keymanager ----------------------------
-# Only relevant when the crypto backend is "keymanager" — hidden for "local".
-- variable: global.keymanagerInstallationName
-  description: |-
-    Internal service name of Keymanager
-  type: reference_service
-  label: Keymanager Service Name
-  group: Keymanager
-  show_if: global.sparCryptoBackend=keymanager
 
 # ----------------------------- Database ------------------------------
 - variable: global.postgresqlHost
