@@ -29,7 +29,12 @@ global:
   #                   partner_keys DB table (seeded below). No Keymanager. Default.
   #   "keymanager" -> remote Keymanager service (the KEYMANAGER_* env in
   #                   sparMapperAPI.envVars).
-  sparCryptoBackend: local
+  # SPAR verifies inbound partner signatures against public keys served by the
+  # Partner Manager (PM) service (partner-mgmt) — no local key store, no Keymanager.
+  sparCryptoBackend: partner-mgmt
+  # In-cluster PM partner-api URL (unauthenticated key fetch). Read by
+  # fastapi-common's PartnerMgmtKeyStore as GET {url}/keys/PARTNER_<mnemonic>.
+  partnerManagementApiUrl: http://partner-management-partner-api
   # RS256 only (asymmetric); "none" and HMAC (HS*) are always rejected.
   sparCryptoAllowedAlgorithms: "RS256"
   # Verify a partner JWS signature on every Mapper Partner API request. ON by
@@ -218,14 +223,13 @@ sparMapperAPI:
     # Partner request Signature JWT verification — ON by default (the trial Bridge
     # signs its resolve calls). Set sparJwtAuthEnabled=false for an unsigned demo.
     SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: '{{ .Values.global.sparJwtAuthEnabled }}'
-    # JWS backend (keymanager | local). local verifies partner certs from the
-    # partner_keys DB table (seeded from CRYPTO_PARTNER_CERTS); no signing key.
+    # Crypto backend = partner-mgmt: verify partner signatures against public keys
+    # fetched from the Partner Manager (PM) service.
     SPAR_MAPPER_PARTNER_API_CRYPTO_BACKEND: '{{ .Values.global.sparCryptoBackend }}'
     SPAR_MAPPER_PARTNER_API_CRYPTO_ALLOWED_ALGORITHMS: '{{ .Values.global.sparCryptoAllowedAlgorithms }}'
-    # Seed-based partner onboarding: JSON list of partner certs upserted into the
-    # partner_keys table at migrate (operator sparPartnerCerts + trial test certs,
-    # incl. the G2P Bridge cert as PARTNER_G2P_BRIDGE).
-    SPAR_MAPPER_PARTNER_API_CRYPTO_PARTNER_CERTS: '{{ include "openg2p-spar.partnerCertsJson" . }}'
+    # PM partner-api (unauthenticated key fetch): GET {url}/keys/PARTNER_<mnemonic>.
+    # Partners (incl. PARTNER_G2P_BRIDGE) are onboarded in PM by the G2P Bridge chart.
+    SPAR_MAPPER_PARTNER_API_PARTNER_MGMT_API_URL: '{{ tpl .Values.global.partnerManagementApiUrl $ }}'
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
     SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'

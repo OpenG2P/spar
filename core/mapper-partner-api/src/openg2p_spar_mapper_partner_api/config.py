@@ -28,3 +28,8 @@ class Settings(BaseSettings):
     keymanager_sign_app_id: str = "SPAR"
     # SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED — when false, signature validation is skipped.
     jwt_auth_enabled: bool = False
+
+    # Verify inbound partner signatures against public keys fetched from the Partner
+    # Manager (PM) service. `partner_mgmt_api_url` + partner_key_* cache settings are
+    # inherited from the openg2p-fastapi-common base Settings.
+    crypto_backend: str = "partner-mgmt"
