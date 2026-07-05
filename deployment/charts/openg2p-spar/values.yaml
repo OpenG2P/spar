@@ -202,10 +202,14 @@ sparMapperAPI:
       secretKeyRef:
         name: '{{ tpl .Values.global.sparDBSecret $ }}'
         key:  '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
+    # optional: only exists when keycloak-init runs (legacy keymanager backend).
+    # With the default partner-mgmt backend keycloak-init is off and this secret is
+    # absent — mark optional so the container still starts (the value is unused).
     SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_SECRET:
       secretKeyRef:
         name: '{{ tpl .Values.global.authClientSecret $ }}'
         key: '{{ tpl .Values.global.authClientSecretKey $ }}'
+        optional: true
 
   containerPort: 8000
   service:
