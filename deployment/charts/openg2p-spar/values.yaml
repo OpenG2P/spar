@@ -34,7 +34,7 @@ global:
   sparCryptoBackend: partner-mgmt
   # In-cluster PM partner-api URL (unauthenticated key fetch). Read by
   # fastapi-common's PartnerMgmtKeyStore as GET {url}/keys/PARTNER_<mnemonic>.
-  partnerManagementApiUrl: http://partner-management-partner-api
+  partnerManagementApiUrl: http://commons-services-pm-partner-api
   # RS256 only (asymmetric); "none" and HMAC (HS*) are always rejected.
   sparCryptoAllowedAlgorithms: "RS256"
   # Verify a partner JWS signature on every Mapper Partner API request. ON by
