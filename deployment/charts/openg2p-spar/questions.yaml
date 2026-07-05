@@ -51,9 +51,9 @@ questions:
   group: Keycloak
 
 # ------------------------ Partner Signatures ------------------------
-# SPAR VERIFIES partner signatures in-process (local JWS, RS256) — no MOSIP
-# Keymanager. Partners are onboarded by seeding their public cert into the
-# partner_keys table (global.sparPartnerCerts).
+# SPAR VERIFIES partner signatures (RS256) against public keys fetched from the
+# Partner Manager (PM) service — no local key store, no Keymanager. Partners are
+# onboarded in PM (the G2P Bridge chart registers PARTNER_G2P_BRIDGE there).
 - variable: global.sparJwtAuthEnabled
   description: Verify a partner JWS signature on every Mapper Partner API request (partners must be onboarded first via Partner Certs)
   type: boolean

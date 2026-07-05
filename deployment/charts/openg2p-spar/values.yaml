@@ -42,48 +42,10 @@ global:
   # unauthenticated demo.
   sparJwtAuthEnabled: true
 
-  # Production partner onboarding (seed-based, local backend) — each entry is
-  # upserted into the partner_keys table at migrate-time. Onboard a partner by
-  # appending their public certificate here (referenceId = PARTNER_<MNEMONIC>):
-  #   sparPartnerCerts:
-  #     - referenceId: PARTNER_MY_PSP
-  #       publicKey: |
-  #         -----BEGIN CERTIFICATE-----
-  #         ...
-  #         -----END CERTIFICATE-----
-  sparPartnerCerts: []
-
-  # TEST/DEMO trial profile. Seeds the committed TEST G2P Bridge public cert so a
-  # trial Bridge — signing its resolve requests as g2p_bridge — is verified out of
-  # the box as PARTNER_G2P_BRIDGE. TEST_SANITY / TRAINING are also seeded (same
-  # key) so the Bridge's sanity suite and Postman walkthrough can call SPAR
-  # directly with that test key. The key is committed (public knowledge), so set
-  # this false for any real deployment.
-  testPartnerEnabled: true
-  testPartnerMnemonics:
-    - G2P_BRIDGE
-    - TEST_SANITY
-    - TRAINING
-  testPartnerCertPem: |
-    -----BEGIN CERTIFICATE-----
-    MIIDDzCCAfegAwIBAgIUJ5fj7XGtXGseT3bVOYPld+xhV/AwDQYJKoZIhvcNAQEL
-    BQAwFzEVMBMGA1UEAwwMdGVzdC1wYXJ0bmVyMB4XDTI2MDYzMDAxNTMyNloXDTM2
-    MDYyNzAxNTMyNlowFzEVMBMGA1UEAwwMdGVzdC1wYXJ0bmVyMIIBIjANBgkqhkiG
-    9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4J/LXhIm69gtBeht8alcQ19DzPgmSwOH/R88
-    3T6881Q/V4iGAcqbE1lK1VwO1WTP2+AWglwd73g7xDDtqZWfOzeAH5B/VlgA4vLq
-    WsmO0pdXf7BLHkhryqzMORdurV5524EUNFRiQmIaAOYzx4jwqgMocCIUPZ83j/d9
-    +0KBi3ITJ8MfCA3QEuY3+XAyY/UbpxsPeZgrrK6cG7nI226yJJ17eUAEWBNErXrw
-    YZPPmGLx2lDNi84wbZg6YDBBNiUqXqoLPU/0OI7kEGv4NatKUJLGtzAO7f09dQ1R
-    9iVMFkqZPVMsJCzfURNAqSQPWfGriZOH2c/iaZPaYzcNybS/zwIDAQABo1MwUTAd
-    BgNVHQ4EFgQUYMNUj0/e3cN9hs2z7XxsXMqBl9IwHwYDVR0jBBgwFoAUYMNUj0/e
-    3cN9hs2z7XxsXMqBl9IwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOC
-    AQEAYcn5xHkBIXYjjHUJQT9vmQmB9VKqniyOo/enNhIjitPa+ejZ9IdiFrTQFb9K
-    WrD2DtTsDyygEo3Fz+MsLvUA0PLaCvJcv45gaU/vLxYwGgN+IYqvIyAKAwZxmNz7
-    ZbrY//Zu7HEckjyRkrakVZPw6Oi1QiRpA35V8q5zvfmqFIULMI4ZhIpw0tcSyk12
-    PPX3Xyqgtb9HlWt+izJacktr71ZrfEVuMpfk4MFwW2oyTJIOYr/0vI2m0ZENL0p8
-    4ZKyP9Xydc9E9emXaC+ARzB3PrEc8Ydd9VoBSftRakRpgSEFiD9v7/NMBvJI6pJV
-    ghl9hlfFpEIHXpmFoBASweRGEg==
-    -----END CERTIFICATE-----
+  # Partner onboarding: partners (incl. the G2P Bridge as PARTNER_G2P_BRIDGE, and the
+  # trial's test partners) are registered in the Partner Manager (PM) service — the
+  # G2P Bridge chart's pm-register Job does this. SPAR seeds nothing; it fetches keys
+  # from PM (see partnerManagementApiUrl above).
 
 postgres-init:
   enabled: true
