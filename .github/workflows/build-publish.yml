@@ -3,20 +3,19 @@ name: Build & Publish
 # Replaces docker-build-*.yml + helm-publish.yml.
 #
 # One workflow, not several: a backend-only change must republish the chart, or
-# the newest chart keeps pointing at the previous image. The old per-image build
-# workflows and helm-publish had disjoint path filters, so that desync was
-# routine.
+# the newest chart keeps pointing at the previous image. The old set had disjoint
+# path filters, so that desync was routine.
 #
-# This file declares only what THIS repo contains. All versioning/changelog
-# policy lives in openg2p-packaging behind @v1 -- see that repo's ci/README.md.
+# This file declares only what THIS repo contains. All versioning policy lives
+# in openg2p-packaging behind @v1 -- see that repo's ci/README.md.
 
-# ---- IDENTICAL BOILERPLATE (do not customise per repo) ----------------------
-# The two inputs are for occasional changelog fixes only. For a normal run leave
-# the checkbox OFF and the text box EMPTY (it rebuilds/publishes the branch).
 on:
   push:
     branches: ["**"]
     tags: ["**"]
+  # These inputs are for two occasional changelog fixes only. For a normal run,
+  # leave the checkbox OFF and the text box EMPTY (it rebuilds/publishes the
+  # selected branch as usual).
   workflow_dispatch:
     inputs:
       changelog_skip_ai:
@@ -32,16 +31,13 @@ jobs:
   build-publish:
     uses: openg2p/openg2p-packaging/.github/workflows/build-publish.yml@v1
     with:
-      # --- IDENTICAL BOILERPLATE ---
       changelog_skip_ai: ${{ inputs.changelog_skip_ai || false }}
       changelog_regenerate: ${{ inputs.changelog_regenerate || '' }}
-      packaging-ref: v1
-
-      # --- PER-REPO DECLARATIONS ---
-      # One entry per Docker image. `pins` (per image) resolve a git-ref build-arg
-      # to a SHA for reproducible builds. Both SPAR APIs build against
-      # fastapi-common `develop` (a branch). SPAR only verifies partner signatures
-      # (no signing key), and has no bundled simulator, so this repo has two images.
+      # `pins` are per-image: they resolve a git-ref build-arg to a SHA so two
+      # builds of the same commit produce identical images. Both SPAR APIs build
+      # against fastapi-common `develop` (a BRANCH), so both pin it. SPAR only
+      # verifies partner signatures (no signing key) and bundles no simulator, so
+      # this repo has two images.
       images: |
         [
           {"name": "mapper-partner-api",
@@ -71,7 +67,8 @@ jobs:
         [".sparMapperAPI.image.tag",
          ".benePortalAPI.image.tag"]
 
-    # ---- IDENTICAL BOILERPLATE ----
+      packaging-ref: v1
+
     secrets:
       docker_hub_actor: ${{ secrets.docker_hub_actor }}
       docker_hub_token: ${{ secrets.docker_hub_token }}
