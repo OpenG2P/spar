@@ -165,7 +165,7 @@ sparMapperAPI:
     enabled: false
   replicaCount: 1
   image:
-    repository: openg2p/openg2p-spar-mapper-partner-api
+    repository: registry.gitlab.com/openg2p/spar/spar/mapper-partner-api
     pullPolicy: Always
     tag: "develop"
   imagePullSecrets: []
@@ -307,7 +307,7 @@ benePortalAPI:
   benePortalHostname: beneficiary.trial.openg2p.org
   replicaCount: 1
   image:
-    repository: openg2p/openg2p-spar-bene-portal-api
+    repository: registry.gitlab.com/openg2p/spar/spar/bene-portal-api
     pullPolicy: Always
     tag: "develop"
   imagePullSecrets: []
