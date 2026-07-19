@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     db_port: int = 5432
     db_dbname: str = "spardb"
 
-    keymanager_sign_app_id: str = "SPAR"
     # SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED — when false, signature validation is skipped.
     jwt_auth_enabled: bool = False
 

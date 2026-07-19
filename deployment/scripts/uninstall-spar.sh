@@ -12,11 +12,8 @@
 #                                           workloads, services, helm-owned
 #                                           secrets & configmaps, istio
 #                                           virtualservices/gateways, etc.)
-#   2. Delete leftover Jobs + their Pods   (subchart jobs: postgres-init and
-#                                           keycloak-init)
+#   2. Delete leftover Jobs + their Pods   (subchart jobs: postgres-init)
 #   3. Sweep leftover Secrets/ConfigMaps   (label: app.kubernetes.io/instance)
-#                                           — EXCLUDING the keycloak-init client
-#                                           secret(s), which are kept intact.
 #   4. Drop Postgres database + role       (via `kubectl exec` into
 #                                           commons-postgresql-0)
 #   5. Delete PVCs by label                (app.kubernetes.io/instance)
@@ -28,15 +25,6 @@
 #                                           release "spar-x" -> db "spar_x"
 # It does NOT drop databases owned by other components.
 #
-# KEYCLOAK CLIENT SECRETS ARE KEPT INTACT.
-#   keycloak-init creates a K8s Secret named after the OIDC clientId
-#   (default: openg2p-spar, key: client_secret) carrying
-#   `helm.sh/resource-policy: keep`, so `helm uninstall` already leaves it.
-#   The Secret sweep in step 3 additionally EXCLUDES anything labeled
-#   `app.kubernetes.io/name=keycloak-init`, so the auto-generated client
-#   password is preserved across uninstall/reinstall. Pass
-#   --purge-keycloak-secrets to delete them too.
-#
 # Requires: kubectl (cluster admin), helm, jq, bash 4+.
 #
 # USAGE:
@@ -45,7 +33,6 @@
 #       [--release <name>]            (default: spar)
 #       [--postgres-release <name>]   (default: commons-postgresql)
 #       [--postgres-namespace <ns>]   (default: same as --namespace)
-#       [--purge-keycloak-secrets]    (ALSO delete keycloak-init client secrets)
 #       [--keep-pvs]                  (delete PVCs but not PVs)
 #       [--dry-run]                   (print actions, change nothing)
 #       [--yes]                       (skip interactive confirmation)
@@ -67,14 +54,9 @@ RELEASE="spar"
 NAMESPACE=""
 POSTGRES_RELEASE="commons-postgresql"
 POSTGRES_NAMESPACE=""
-PURGE_KEYCLOAK_SECRETS=false
 KEEP_PVS=false
 DRY_RUN=false
 ASSUME_YES=false
-
-# keycloak-init subchart name (label app.kubernetes.io/name on its resources).
-# Only change this if the chart sets keycloak-init.nameOverride.
-KEYCLOAK_INIT_NAME="keycloak-init"
 
 # ---------- cli ----------
 usage() { sed -n '2,60p' "$0"; exit 1; }
@@ -85,7 +67,6 @@ while [[ $# -gt 0 ]]; do
     --namespace|-n)         NAMESPACE="$2";            shift 2 ;;
     --postgres-release)     POSTGRES_RELEASE="$2";     shift 2 ;;
     --postgres-namespace)   POSTGRES_NAMESPACE="$2";   shift 2 ;;
-    --purge-keycloak-secrets) PURGE_KEYCLOAK_SECRETS=true; shift ;;
     --keep-pvs)             KEEP_PVS=true;             shift ;;
     --dry-run)              DRY_RUN=true;              shift ;;
     --yes|-y)               ASSUME_YES=true;           shift ;;
@@ -134,13 +115,8 @@ kexec_psql() {
   fi
 }
 
-# Secret label selector for the sweep. Excludes keycloak-init client secret(s)
-# unless the operator explicitly opts in to purging them.
-if [[ "$PURGE_KEYCLOAK_SECRETS" == true ]]; then
-  SECRET_SELECTOR="app.kubernetes.io/instance=$RELEASE"
-else
-  SECRET_SELECTOR="app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/name!=$KEYCLOAK_INIT_NAME"
-fi
+# Secret label selector for the sweep.
+SECRET_SELECTOR="app.kubernetes.io/instance=$RELEASE"
 
 # ---------- pre-flight ----------
 _blue "==> Pre-flight checks"
@@ -210,12 +186,6 @@ echo "Will PRESERVE (NOT deleted):"
 echo "  - Postgres instance/pod: ${PG_POD:-<not found — DB drop will be skipped>} ($POSTGRES_NAMESPACE)"
 echo "      (the script only 'kubectl exec's into it to DROP the database/role above)"
 echo "  - Other databases owned by other components"
-if [[ "$PURGE_KEYCLOAK_SECRETS" == false ]]; then
-  echo "  - Keycloak client secrets: any Secret labeled app.kubernetes.io/name=$KEYCLOAK_INIT_NAME"
-  echo "      (e.g. 'openg2p-spar' — the OIDC client password, kept for reinstall)"
-else
-  _yellow "  - (--purge-keycloak-secrets given: keycloak client secrets WILL be deleted)"
-fi
 echo
 
 if [[ "$NAMESPACE_EXISTS" == true ]]; then
@@ -225,11 +195,6 @@ if [[ "$NAMESPACE_EXISTS" == true ]]; then
 
   echo "Secrets to delete ($SECRET_SELECTOR):"
   kubectl -n "$NAMESPACE" get secret -l "$SECRET_SELECTOR" \
-    --no-headers 2>/dev/null | awk '{print "  - " $1}' || echo "  (none)"
-
-  echo "Secrets to KEEP (label app.kubernetes.io/name=$KEYCLOAK_INIT_NAME):"
-  kubectl -n "$NAMESPACE" get secret \
-    -l "app.kubernetes.io/instance=$RELEASE,app.kubernetes.io/name=$KEYCLOAK_INIT_NAME" \
     --no-headers 2>/dev/null | awk '{print "  - " $1}' || echo "  (none)"
 
   echo "ConfigMaps (label app.kubernetes.io/instance=$RELEASE):"
@@ -277,7 +242,7 @@ else
 fi
 
 # ========== STEP 2: delete leftover Jobs (and their Pods) ==========
-# Subchart Jobs (postgres-init, keycloak-init) may linger after uninstall.
+# Subchart Jobs (postgres-init) may linger after uninstall.
 # Delete them BEFORE dropping the DB, so their Pods close Postgres connections
 # cleanly. This deletes Jobs only — the keycloak client SECRET is untouched.
 _blue "==> [2/6] Delete leftover Jobs and their Pods"
@@ -290,9 +255,7 @@ else
 fi
 
 # ========== STEP 3: sweep leftover Secrets & ConfigMaps ==========
-# Secret sweep uses $SECRET_SELECTOR, which (unless --purge-keycloak-secrets)
-# EXCLUDES app.kubernetes.io/name=keycloak-init so the OIDC client secret(s)
-# are kept intact.
+# Secret sweep uses $SECRET_SELECTOR (all resources labeled with this release).
 _blue "==> [3/6] Sweep leftover Secrets / ConfigMaps"
 if [[ "$NAMESPACE_EXISTS" == true ]]; then
   run "kubectl -n '$NAMESPACE' delete secret    -l '$SECRET_SELECTOR' --ignore-not-found"
@@ -359,11 +322,3 @@ _green "==> Done."
 if [[ "$DRY_RUN" == true ]]; then
   _yellow "    (dry-run — nothing was actually changed)"
 fi
-if [[ "$PURGE_KEYCLOAK_SECRETS" == false ]]; then
-  _yellow "Note: Keycloak client secret(s) (e.g. 'openg2p-spar') were KEPT intact."
-  _yellow "      They carry helm.sh/resource-policy: keep and are excluded from the"
-  _yellow "      sweep, so a reinstall reuses the same client password."
-  _yellow "      Re-run with --purge-keycloak-secrets to remove them as well."
-fi
-_yellow "Note: the Keycloak realm/client itself lives in Keycloak (not this"
-_yellow "      namespace) and is left untouched. keycloak-init is idempotent."

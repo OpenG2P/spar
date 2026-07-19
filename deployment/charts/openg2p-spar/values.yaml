@@ -5,32 +5,11 @@ global:
   sparDBSecret: '{{ .Release.Name }}'
   sparDBUserPasswordKey: '{{ .Release.Name }}-db-user'
 
-  # Security & Authentication
-  # Internal service name of Keymanager
-  keymanagerInstallationName: commons-services-keymanager
-  # Public (namespace-scoped) Keycloak hostname used by apps for the OIDC
-  # issuer/token URL. The keycloak-init Job below talks to the same Keycloak
-  # over its internal cluster URL.
-  keycloakBaseUrl: 'https://keycloak.{{ .Release.Namespace }}.openg2p.org'
-  keycloakRealm: 'staff'
-  keycloakIssuerUrl: '{{ tpl .Values.global.keycloakBaseUrl $ }}/realms/{{ tpl .Values.global.keycloakRealm $ }}'
-  # OIDC client ID — must match the clientId provisioned in keycloak-init.realms
-  authClientId: 'openg2p-spar'
-  # K8s Secret name holding the client password (created by keycloak-init).
-  # By convention the Secret is named after the client ID.
-  authClientSecret: '{{ tpl .Values.global.authClientId $ }}'
-  # Key inside the secret containing the client password
-  authClientSecretKey: 'client_secret'
-
   # ── JWS signature verification (openg2p-fastapi-common) ───────────────────
   # SPAR only VERIFIES partner signatures (it never signs), so there is no signing
-  # key / .p12. Backend:
-  #   "local"      -> in-process PyJWT; partner public certs verified from the
-  #                   partner_keys DB table (seeded below). No Keymanager. Default.
-  #   "keymanager" -> remote Keymanager service (the KEYMANAGER_* env in
-  #                   sparMapperAPI.envVars).
-  # SPAR verifies inbound partner signatures against public keys served by the
-  # Partner Manager (PM) service (partner-mgmt) — no local key store, no Keymanager.
+  # key / .p12. It verifies inbound partner signatures against public keys served
+  # by the Partner Manager (PM) service (partner-mgmt); `local` (the in-process
+  # partner_keys DB table) remains as a legacy backend.
   sparCryptoBackend: partner-mgmt
   # In-cluster PM partner-api URL (unauthenticated key fetch). Read by
   # fastapi-common's PartnerMgmtKeyStore as GET {url}/keys/PARTNER_<mnemonic>.
@@ -76,38 +55,6 @@ dbPasswordSync:
     repository: jbergknoff/postgresql-client
     tag: latest
     pullPolicy: IfNotPresent
-
-# Provisions the SPAR OIDC client in Keycloak. The Job is idempotent: it
-# creates the realm if absent and adds the client, leaving anything that
-# already exists untouched. For each confidential client it also creates a
-# K8s Secret named after the clientId (key: client_secret) with an
-# auto-generated password — this is the Secret the mapper API consumes via
-# global.authClientSecret / global.authClientSecretKey above.
-# NOTE: realm/clientId reference the global.* values (the only values visible
-# to a subchart) so they are defined once and never duplicated here.
-# OFF by default: the openg2p-spar OIDC client is only used to authenticate the
-# Mapper API to MOSIP Keymanager, which the default local crypto backend does not
-# use. Enable only if you switch global.sparCryptoBackend to the legacy "keymanager".
-keycloak-init:
-  enabled: false
-  keycloak:
-    # Internal cluster URL of the Keycloak installed in this namespace.
-    url: 'http://commons-keycloak:80'
-    user: 'admin'
-    password: ''
-    # The Keycloak chart's auto-created admin secret (<commons-release>-keycloak).
-    existingSecret: 'commons-keycloak'
-    existingSecretKey: 'admin-password'
-  realms:
-    '{{ tpl .Values.global.keycloakRealm $ }}':
-      clients:
-        - clientId: '{{ tpl .Values.global.authClientId $ }}'
-          name: OpenG2P SPAR
-          # Confidential service-to-service client (OAuth2 client_credentials):
-          # the mapper API exchanges client id + secret for a token. It has no
-          # browser login flow, so no redirect URIs / web origins are needed.
-          redirectUris: []
-          webOrigins: []
 
 # Seeds shared SPAR reference data (the `strategy` table) at install/upgrade via
 # a post-install/post-upgrade Job. Seeding is ADDITIVE and IDEMPOTENT: each row
@@ -173,15 +120,6 @@ sparMapperAPI:
   fullnameOverride: ""
   envVars:
     SPAR_MAPPER_PARTNER_API_DB_HOSTNAME: '{{ .Values.global.postgresqlHost }}'
-    # Keymanager (request signature verify / sign). The app's KeymanagerCryptoHelper
-    # reads these KEYMANAGER_* settings and appends /jwtVerify and /jwtSign to the
-    # base URL itself, so this must be the base path (no /jwtVerify suffix).
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_API_BASE_URL: 'http://{{ .Values.global.keymanagerInstallationName }}/v1/keymanager'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_SIGN_APP_ID: 'OPENG2P_SPAR'
-    # Keymanager is reached over its in-cluster Service, which does not enforce OAuth,
-    # so auth is disabled. To enable, set this 'true'; AUTH_URL / CLIENT_ID / the
-    # CLIENT_SECRET in envVarsFrom below are already wired for that case.
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_ENABLED: 'false'
     # Partner request Signature JWT verification — ON by default (the trial Bridge
     # signs its resolve calls). Set sparJwtAuthEnabled=false for an unsigned demo.
     SPAR_MAPPER_PARTNER_API_JWT_AUTH_ENABLED: '{{ .Values.global.sparJwtAuthEnabled }}'
@@ -192,8 +130,6 @@ sparMapperAPI:
     # PM partner-api (unauthenticated key fetch): GET {url}/keys/PARTNER_<mnemonic>.
     # Partners (incl. PARTNER_G2P_BRIDGE) are onboarded in PM by the G2P Bridge chart.
     SPAR_MAPPER_PARTNER_API_PARTNER_MGMT_API_URL: '{{ tpl .Values.global.partnerManagementApiUrl $ }}'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_URL: '{{ tpl .Values.global.keycloakIssuerUrl $ }}/protocol/openid-connect/token'
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_ID: '{{ tpl .Values.global.authClientId $ }}'
     SPAR_MAPPER_PARTNER_API_DB_DBNAME: '{{ tpl .Values.global.sparDB $ }}'
     SPAR_MAPPER_PARTNER_API_DB_USERNAME: '{{ tpl .Values.global.sparDBUser $ }}'
     SPAR_MAPPER_PARTNER_API_OPENAPI_ROOT_PATH: "/api/mapper"
@@ -202,14 +138,6 @@ sparMapperAPI:
       secretKeyRef:
         name: '{{ tpl .Values.global.sparDBSecret $ }}'
         key:  '{{ tpl .Values.global.sparDBUserPasswordKey $ }}'
-    # optional: only exists when keycloak-init runs (legacy keymanager backend).
-    # With the default partner-mgmt backend keycloak-init is off and this secret is
-    # absent — mark optional so the container still starts (the value is unused).
-    SPAR_MAPPER_PARTNER_API_KEYMANAGER_AUTH_CLIENT_SECRET:
-      secretKeyRef:
-        name: '{{ tpl .Values.global.authClientSecret $ }}'
-        key: '{{ tpl .Values.global.authClientSecretKey $ }}'
-        optional: true
 
   containerPort: 8000
   service:

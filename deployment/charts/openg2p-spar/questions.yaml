@@ -12,48 +12,10 @@ questions:
   label: Beneficiary Portal Hostname
   group: Hostnames
 
-# ----------------------------- Keycloak ------------------------------
-- variable: keycloak-init.enabled
-  description: Provision the SPAR OIDC client. Only needed for the legacy Keymanager crypto backend — leave OFF for the default local backend (SPAR verifies signatures in-process, no Keycloak).
-  type: boolean
-  default: false
-  label: Create Keycloak Client (Keymanager only)
-  group: Keycloak
-
-- variable: global.keycloakBaseUrl
-  description: Public (namespace-scoped) Keycloak base URL used by apps for the OIDC issuer/token URL
-  type: string
-  label: Keycloak Base URL
-  group: Keycloak
-
-- variable: global.keycloakRealm
-  description: Keycloak realm in which the SPAR client is provisioned and tokens are issued
-  type: string
-  label: Keycloak Realm
-  group: Keycloak
-
-- variable: global.authClientId
-  description: OIDC client ID (must match the client provisioned by keycloak-init)
-  type: string
-  label: OIDC Client ID
-  group: Keycloak
-
-- variable: global.authClientSecret
-  description: Kubernetes secret name holding the OIDC client password
-  type: string
-  label: OIDC Client Secret Name
-  group: Keycloak
-
-- variable: global.authClientSecretKey
-  description: Key within the secret containing the OIDC client password
-  type: string
-  label: OIDC Client Secret Key
-  group: Keycloak
-
 # ------------------------ Partner Signatures ------------------------
 # SPAR VERIFIES partner signatures (RS256) against public keys fetched from the
-# Partner Manager (PM) service — no local key store, no Keymanager. Partners are
-# onboarded in PM (the G2P Bridge chart registers PARTNER_G2P_BRIDGE there).
+# Partner Manager (PM) service — no local key store. Partners are onboarded in PM
+# (the G2P Bridge chart registers PARTNER_G2P_BRIDGE there).
 - variable: global.sparJwtAuthEnabled
   description: Verify a partner JWS signature on every Mapper Partner API request (partners must be onboarded first via Partner Certs)
   type: boolean
